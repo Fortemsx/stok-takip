@@ -11,18 +11,12 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Set up Python with Tkinter
+    - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
     
-    - name: Install system dependencies
-      run: |
-        # Tkinter desteği için gerekli paketler
-        choco install -y python --params "/InstallTkinter=1"
-        refreshenv
-    
-    - name: Install Python dependencies
+    - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install ttkthemes tkcalendar pandas pyinstaller
@@ -35,10 +29,10 @@ jobs:
           sqlite3 stok_takip.db "VACUUM;"
         )
         
-    - name: Build with PyInstaller (debug mode)
+    - name: Build with PyInstaller
       working-directory: ./src
       run: |
-        pyinstaller --onefile --windowed --name StokTakip --add-data "stok_takip.db;." --debug all stok_takip.py
+        pyinstaller --onefile --windowed --name StokTakip --add-data "stok_takip.db;." --add-data "*.ttf;." stok_takip.py
         
     - name: Check build artifacts
       working-directory: ./src
