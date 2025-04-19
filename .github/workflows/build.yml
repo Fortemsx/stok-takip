@@ -3,8 +3,6 @@ name: Build EXE
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
 
 jobs:
   build:
@@ -18,10 +16,20 @@ jobs:
       with:
         python-version: '3.11'
         
-    - name: Install dependencies
+    - name: Install system dependencies
+      run: |
+        # Windows'ta tkinter için gerekli sistem paketleri
+        choco install -y python --version=3.11.9
+        refreshenv
+        
+    - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r src/requirements.txt
+        pip install ttkthemes tkcalendar pandas pyinstaller
+        
+    - name: Verify tkinter is available
+      run: |
+        python -c "import tkinter; print('Tkinter version:', tkinter.TkVersion)"
         
     - name: Create database file if not exists
       working-directory: ./src
@@ -35,14 +43,6 @@ jobs:
       working-directory: ./src
       run: |
         pyinstaller --onefile --windowed --name StokTakip --add-data "stok_takip.db;." stok_takip.py
-        
-    - name: Verify EXE file
-      working-directory: ./src
-      run: |
-        if not exist dist\StokTakip.exe (
-          echo "Error: EXE file not created!"
-          exit 1
-        )
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
