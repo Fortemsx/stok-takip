@@ -21,6 +21,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install ttkthemes tkcalendar pandas pyinstaller
         
+    - name: Install SQLite
+      run: choco install sqlite -y
+      
     - name: Create database file
       working-directory: ./src
       run: |
