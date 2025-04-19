@@ -38,7 +38,7 @@ jobs:
     - name: Build with PyInstaller (debug mode)
       working-directory: ./src
       run: |
-        pyinstaller --onefile --windowed --name StokTakip --add-data "stok_takip.db;." --debug all deneme.py
+        pyinstaller --onefile --windowed --name StokTakip --add-data "stok_takip.db;." --debug all stok_takip.py
         
     - name: Check build artifacts
       working-directory: ./src
