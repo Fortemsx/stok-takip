@@ -1,6 +1,4 @@
-tkinter
-ttkthemes
-tkcalendar
-pandas
-sqlite3
-pyinstaller
+tkcalendar==1.6.1
+pandas==1.3.5
+pyinstaller==4.10
+ttkthemes==3.2.2
