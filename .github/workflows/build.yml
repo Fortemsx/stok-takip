@@ -24,25 +24,25 @@ jobs:
     - name: Create database file
       working-directory: ./src
       run: |
-        if not exist stok_takip.db (
-          echo "Creating empty database file"
+        if (!(Test-Path -Path "stok_takip.db")) {
           sqlite3 stok_takip.db "VACUUM;"
-        )
+          Write-Output "Database file created"
+        }
         
     - name: Build with PyInstaller
       working-directory: ./src
       run: |
-        pyinstaller --onefile --windowed --name StokTakip --add-data "stok_takip.db;." --add-data "*.ttf;." stok_takip.py
+        pyinstaller --onefile --windowed --name StokTakip --add-data "stok_takip.db;." stok_takip.py
         
     - name: Check build artifacts
       working-directory: ./src
       run: |
-        if not exist dist\StokTakip.exe (
-          echo "Build failed - listing directory contents:"
-          dir
-          dir dist
+        if (!(Test-Path -Path "dist\StokTakip.exe")) {
+          Write-Output "Build failed - listing directory contents:"
+          Get-ChildItem
+          Get-ChildItem -Path dist
           exit 1
-        )
+        }
         
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
