@@ -3,11 +3,21 @@ from tkinter import ttk, messagebox, filedialog
 from datetime import datetime
 import sqlite3
 import os
+import sys
 import locale
 from tkcalendar import DateEntry
 import shutil
 import pandas as pd
 
+# PyInstaller için önemli: Kaynak dosya yolunu belirleme
+def resource_path(relative_path):
+    """ PyInstaller için doğru kaynak yolunu al """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
 
 # Solar tema renkleri (modernleştirilmiş)
 BG_COLOR = "#002b36"       # Koyu arka plan
@@ -38,17 +48,25 @@ class StopTakipPro:
         self.root = root
         self.root.title("Temelli Stok Takip")
         self.root.geometry("1366x768")
-        self.root.state('zoomed')
+        
+        # Windows'ta DPI farkındalığı
+        if os.name == 'nt':
+            self.root.state('zoomed')
+            try:
+                from ctypes import windll
+                windll.shcore.SetProcessDpiAwareness(1)
+            except:
+                pass
+        
+        # Veritabanı bağlantısı (EXE ile uyumlu)
+        self.db_path = resource_path("stop_takip.db")
+        self.conn = sqlite3.connect(self.db_path)
+        self.c = self.conn.cursor()
+        self._create_database()
         
         # Stil ayarları
         self.style = ttk.Style()
         self._configure_styles()
-        
-        # Veritabanı bağlantısı
-        self.db_path = os.path.join(os.path.dirname(__file__), "stop_takip.db")
-        self.conn = sqlite3.connect(self.db_path)
-        self.c = self.conn.cursor()
-        self._create_database()
         
         # Arayüz bileşenleri
         self._setup_ui()
@@ -60,7 +78,7 @@ class StopTakipPro:
         self._load_categories()
         self._update_dashboard()
         self._update_malzeme_listesi()
-        self._load_mevcut_stok()  # Mevcut stok verilerini yükle
+        self._load_mevcut_stok()
 
     def _configure_styles(self):
         """Tema ve stil ayarlarını yapar"""
@@ -291,7 +309,7 @@ class StopTakipPro:
         # Malzeme Çıktı Sekmesi
         self._setup_malzeme_cikti()
         
-        # Depo Takip Sekmesi (Yeniden düzenlenmiş)
+        # Depo Takip Sekmesi
         self._setup_depo_takip()
         
         # Aylık Rapor Sekmesi
@@ -1594,10 +1612,9 @@ class StopTakipPro:
             # DataFrame oluştur
             df = pd.DataFrame(items, columns=columns)
             
-            # Dosya yolu (scriptin olduğu dizin)
-            script_dir = os.path.dirname(os.path.abspath(__file__))
+            # Dosya yolu (EXE ile uyumlu)
             filename = f"stok_rapor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            filepath = os.path.join(script_dir, filename)
+            filepath = resource_path(filename)
             
             # Excel'e yaz
             df.to_excel(filepath, index=False)
@@ -1608,11 +1625,5 @@ class StopTakipPro:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    
-    # Windows'ta daha iyi görünüm için
-    if os.name == 'nt':
-        from ctypes import windll
-        windll.shcore.SetProcessDpiAwareness(1)
-    
     app = StopTakipPro(root)
     root.mainloop()
