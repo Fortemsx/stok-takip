@@ -15,9 +15,24 @@ def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.abspath(".")
-
+        base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+    
     return os.path.join(base_path, relative_path)
+
+# Uygulama veri dizini oluşturma
+def get_app_data_path():
+    """Uygulama verilerinin saklanacağı dizini döndürür"""
+    if getattr(sys, 'frozen', False):
+        # EXE olarak çalışıyorsa
+        app_path = os.path.dirname(sys.executable)
+    else:
+        # Script olarak çalışıyorsa
+        app_path = os.path.dirname(os.path.abspath(__file__))
+    
+    data_path = os.path.join(app_path, 'app_data')
+    if not os.path.exists(data_path):
+        os.makedirs(data_path)
+    return data_path
 
 # Solar tema renkleri (modernleştirilmiş)
 BG_COLOR = "#002b36"       # Koyu arka plan
@@ -59,7 +74,7 @@ class StopTakipPro:
                 pass
         
         # Veritabanı bağlantısı (EXE ile uyumlu)
-        self.db_path = resource_path("stop_takip.db")
+        self.db_path = os.path.join(get_app_data_path(), "stop_takip.db")
         self.conn = sqlite3.connect(self.db_path)
         self.c = self.conn.cursor()
         self._create_database()
@@ -292,7 +307,7 @@ class StopTakipPro:
         
         # Çıkış butonu
         exit_btn = ttk.Button(self.sidebar, text="🚪 Çıkış", 
-                            style="Sidebar.TButton", command=self.root.quit)
+                            style="Sidebar.TButton", command=self._on_close)
         exit_btn.pack(side=tk.BOTTOM, fill=tk.X, pady=(0, 20))
         
         # Ana içerik alanı
@@ -320,6 +335,11 @@ class StopTakipPro:
         
         # Dashboard (başlangıçta gizli)
         self._setup_dashboard()
+
+    def _on_close(self):
+        """Uygulama kapatılırken veritabanı bağlantısını kapat"""
+        self.conn.close()
+        self.root.quit()
 
     def _show_dashboard(self):
         """Dashboard'ı gösterir"""
@@ -1456,13 +1476,23 @@ class StopTakipPro:
     def _backup_db(self):
         """Veritabanı yedeği alır"""
         try:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
+            backup_dir = os.path.join(get_app_data_path(), "backups")
+            if not os.path.exists(backup_dir):
+                os.makedirs(backup_dir)
+            
             backup_filename = f"stop_takip_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-            backup_path = os.path.join(script_dir, backup_filename)
+            backup_path = os.path.join(backup_dir, backup_filename)
             
             # Veritabanını kopyala
             shutil.copy2(self.db_path, backup_path)
-            messagebox.showinfo("Başarılı", f"Veritabanı yedeği alındı:\n{backup_filename}")
+            
+            # Yedek klasörünü aç
+            if os.name == 'nt':  # Windows
+                os.startfile(backup_dir)
+            elif os.name == 'posix':  # macOS ve Linux
+                os.system(f'open "{backup_dir}"' if sys.platform == 'darwin' else f'xdg-open "{backup_dir}"')
+            
+            messagebox.showinfo("Başarılı", f"Veritabanı yedeği alındı:\n{backup_path}")
         
         except Exception as e:
             messagebox.showerror("Hata", f"Yedek alınamadı:\n{str(e)}")
@@ -1472,7 +1502,8 @@ class StopTakipPro:
         try:
             backup_file = filedialog.askopenfilename(
                 title="Yedek Dosyasını Seçin",
-                filetypes=[("Veritabanı Dosyaları", "*.db"), ("Tüm Dosyalar", "*.*")]
+                filetypes=[("Veritabanı Dosyaları", "*.db"), ("Tüm Dosyalar", "*.*")],
+                initialdir=os.path.join(get_app_data_path(), "backups")
             )
             
             if backup_file:
@@ -1518,15 +1549,18 @@ class StopTakipPro:
         )
         
         if confirm:
-            self.c.execute("DELETE FROM malzeme_girisleri")
-            self.c.execute("DELETE FROM malzeme_cikislari")
-            self.c.execute("DELETE FROM mevcut_stok")
-            self.conn.commit()
-            messagebox.showinfo("Başarılı", "Tüm veriler silindi!")
-            self._load_hareket_raporu()
-            self._load_categories()
-            self._update_dashboard()
-            self._update_malzeme_listesi()
+            try:
+                self.c.execute("DELETE FROM malzeme_girisleri")
+                self.c.execute("DELETE FROM malzeme_cikislari")
+                self.c.execute("DELETE FROM mevcut_stok")
+                self.conn.commit()
+                messagebox.showinfo("Başarılı", "Tüm veriler silindi!")
+                self._load_hareket_raporu()
+                self._load_categories()
+                self._update_dashboard()
+                self._update_malzeme_listesi()
+            except Exception as e:
+                messagebox.showerror("Hata", f"Veriler silinirken hata oluştu:\n{str(e)}")
 
     def _add_category(self):
         """Yeni kategori ekler"""
@@ -1612,13 +1646,25 @@ class StopTakipPro:
             # DataFrame oluştur
             df = pd.DataFrame(items, columns=columns)
             
-            # Dosya yolu (EXE ile uyumlu)
+            # Excel dosyasını kaydetmek için klasör oluştur
+            export_dir = os.path.join(get_app_data_path(), "exports")
+            if not os.path.exists(export_dir):
+                os.makedirs(export_dir)
+            
+            # Dosya yolu
             filename = f"stok_rapor_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-            filepath = resource_path(filename)
+            filepath = os.path.join(export_dir, filename)
             
             # Excel'e yaz
             df.to_excel(filepath, index=False)
-            messagebox.showinfo("Başarılı", f"Excel raporu oluşturuldu:\n{filename}")
+            
+            # Klasörü aç
+            if os.name == 'nt':  # Windows
+                os.startfile(export_dir)
+            elif os.name == 'posix':  # macOS ve Linux
+                os.system(f'open "{export_dir}"' if sys.platform == 'darwin' else f'xdg-open "{export_dir}"')
+            
+            messagebox.showinfo("Başarılı", f"Excel raporu oluşturuldu:\n{filepath}")
         
         except Exception as e:
             messagebox.showerror("Hata", f"Excel oluşturulamadı:\n{str(e)}")
