@@ -15,24 +15,21 @@ def resource_path(relative_path):
     try:
         base_path = sys._MEIPASS
     except Exception:
-        base_path = os.path.dirname(os.path.abspath(sys.argv[0]))
+        base_path = os.path.dirname(os.path.abspath(__file__))
     
     return os.path.join(base_path, relative_path)
 
 # Uygulama veri dizini oluşturma
 def get_app_data_path():
     """Uygulama verilerinin saklanacağı dizini döndürür"""
-    if getattr(sys, 'frozen', False):
-        # EXE olarak çalışıyorsa
-        app_path = os.path.dirname(sys.executable)
-    else:
-        # Script olarak çalışıyorsa
-        app_path = os.path.dirname(os.path.abspath(__file__))
+    if os.name == 'nt':  # Windows
+        app_data = os.path.join(os.getenv('APPDATA'), 'StokTakipPro')
+    else:  # Linux/Mac
+        app_data = os.path.join(os.path.expanduser('~'), '.stoktakip')
     
-    data_path = os.path.join(app_path, 'app_data')
-    if not os.path.exists(data_path):
-        os.makedirs(data_path)
-    return data_path
+    if not os.path.exists(app_data):
+        os.makedirs(app_data)
+    return app_data
 
 # Solar tema renkleri (modernleştirilmiş)
 BG_COLOR = "#002b36"       # Koyu arka plan
@@ -75,9 +72,7 @@ class StopTakipPro:
         
         # Veritabanı bağlantısı (EXE ile uyumlu)
         self.db_path = os.path.join(get_app_data_path(), "stop_takip.db")
-        self.conn = sqlite3.connect(self.db_path)
-        self.c = self.conn.cursor()
-        self._create_database()
+        self._initialize_database()
         
         # Stil ayarları
         self.style = ttk.Style()
@@ -87,6 +82,50 @@ class StopTakipPro:
         self._setup_ui()
         self._load_data()
         
+    def _initialize_database(self):
+        """Veritabanını başlatır ve bağlantıyı açar"""
+        # Veritabanı yoksa oluştur
+        db_exists = os.path.exists(self.db_path)
+        
+        self.conn = sqlite3.connect(self.db_path)
+        self.c = self.conn.cursor()
+        
+        if not db_exists:
+            self._create_database()
+    
+    def _create_database(self):
+        """Veritabanı tablosunu oluşturur"""
+        # Eski tabloları sil (sadece ilk kurulumda)
+        self.c.execute("DROP TABLE IF EXISTS malzeme_girisleri")
+        self.c.execute("DROP TABLE IF EXISTS malzeme_cikislari")
+        self.c.execute("DROP TABLE IF EXISTS mevcut_stok")
+    
+        # Yeni tabloları oluştur
+        self.c.execute('''CREATE TABLE IF NOT EXISTS malzeme_girisleri
+                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                           ad TEXT NOT NULL,
+                           fiyat REAL NOT NULL,
+                           adet INTEGER NOT NULL,
+                           kdv REAL NOT NULL,
+                           toplam REAL NOT NULL,
+                           tarih TEXT NOT NULL,
+                           kategori TEXT,
+                           tedarikci TEXT)''')
+    
+        self.c.execute('''CREATE TABLE IF NOT EXISTS malzeme_cikislari
+                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                           giris_id INTEGER NOT NULL,
+                           malzeme_adi TEXT NOT NULL,
+                           cikis_adedi INTEGER NOT NULL,
+                           personel TEXT NOT NULL,
+                           tarih TEXT NOT NULL,
+                           FOREIGN KEY(giris_id) REFERENCES malzeme_girisleri(id))''')
+    
+        self.c.execute('''CREATE TABLE IF NOT EXISTS mevcut_stok
+                          (malzeme_adi TEXT PRIMARY KEY,
+                           toplam_adet INTEGER NOT NULL)''')
+        self.conn.commit()
+
     def _load_data(self):
         """Verileri yüklemek için genel metod"""
         self._load_hareket_raporu()
@@ -409,39 +448,6 @@ class StopTakipPro:
         self.c.execute("SELECT COUNT(DISTINCT kategori) FROM malzeme_girisleri WHERE kategori IS NOT NULL")
         categories = self.c.fetchone()[0] or 0
         self.dashboard_kategori_sayısı.config(text=str(categories))
-
-    def _create_database(self):
-        """Veritabanı tablosunu oluşturur"""
-        # Eski tabloları sil
-        self.c.execute("DROP TABLE IF EXISTS malzeme_girisleri")
-        self.c.execute("DROP TABLE IF EXISTS malzeme_cikislari")
-        self.c.execute("DROP TABLE IF EXISTS mevcut_stok")
-    
-        # Yeni tabloları oluştur
-        self.c.execute('''CREATE TABLE IF NOT EXISTS malzeme_girisleri
-                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                           ad TEXT NOT NULL,
-                           fiyat REAL NOT NULL,
-                           adet INTEGER NOT NULL,
-                           kdv REAL NOT NULL,
-                           toplam REAL NOT NULL,
-                           tarih TEXT NOT NULL,
-                           kategori TEXT,
-                           tedarikci TEXT)''')
-    
-        self.c.execute('''CREATE TABLE IF NOT EXISTS malzeme_cikislari
-                          (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                           giris_id INTEGER NOT NULL,
-                           malzeme_adi TEXT NOT NULL,
-                           cikis_adedi INTEGER NOT NULL,
-                           personel TEXT NOT NULL,
-                           tarih TEXT NOT NULL,
-                           FOREIGN KEY(giris_id) REFERENCES malzeme_girisleri(id))''')
-    
-        self.c.execute('''CREATE TABLE IF NOT EXISTS mevcut_stok
-                          (malzeme_adi TEXT PRIMARY KEY,
-                           toplam_adet INTEGER NOT NULL)''')
-        self.conn.commit()
 
     def _setup_malzeme_ekleme(self):
         """Malzeme ekleme sekmesini oluşturur"""
