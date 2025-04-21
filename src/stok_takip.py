@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-from datetime import datetime
+from datetime import datetime, timedelta
 import sqlite3
 import os
 import sys
@@ -70,6 +70,9 @@ class StopTakipPro:
             except:
                 pass
         
+        # Varsayılan KDV oranı
+        self.default_kdv_rate = 20  # %20
+        
         # Veritabanı bağlantısı (EXE ile uyumlu)
         self.db_path = os.path.join(get_app_data_path(), "stop_takip.db")
         self._initialize_database()
@@ -107,6 +110,7 @@ class StopTakipPro:
                            fiyat REAL NOT NULL,
                            adet INTEGER NOT NULL,
                            kdv REAL NOT NULL,
+                           kdv_tutari REAL NOT NULL,
                            toplam REAL NOT NULL,
                            tarih TEXT NOT NULL,
                            kategori TEXT,
@@ -118,6 +122,7 @@ class StopTakipPro:
                            malzeme_adi TEXT NOT NULL,
                            cikis_adedi INTEGER NOT NULL,
                            personel TEXT NOT NULL,
+                           aciklama TEXT,
                            tarih TEXT NOT NULL,
                            FOREIGN KEY(giris_id) REFERENCES malzeme_girisleri(id))''')
     
@@ -512,7 +517,7 @@ class StopTakipPro:
             entry.pack(side=tk.LEFT, padx=10)
             
             if label == "KDV Oranı (%):":
-                entry.insert(0, "20")  # Varsayılan KDV
+                entry.insert(0, str(self.default_kdv_rate))  # Varsayılan KDV
         
         # Butonlar
         btn_frame = ttk.Frame(form_frame)
@@ -572,6 +577,16 @@ class StopTakipPro:
         self.cikti_miktar = ttk.Entry(row_frame, width=30, font=FONT_PRIMARY)
         self.cikti_miktar.pack(side=tk.LEFT, padx=10)
         
+        # Açıklama
+        row_frame = ttk.Frame(form_frame)
+        row_frame.pack(fill=tk.X, pady=10)
+        
+        ttk.Label(row_frame, text="Açıklama:", width=15, anchor="e", 
+                 style="TLabel").pack(side=tk.LEFT, padx=10)
+        
+        self.cikti_aciklama = ttk.Entry(row_frame, width=30, font=FONT_PRIMARY)
+        self.cikti_aciklama.pack(side=tk.LEFT, padx=10)
+        
         # Tarih
         row_frame = ttk.Frame(form_frame)
         row_frame.pack(fill=tk.X, pady=10)
@@ -626,6 +641,7 @@ class StopTakipPro:
         self.cikti_malzeme.set('')
         self.cikti_personel.delete(0, tk.END)
         self.cikti_miktar.delete(0, tk.END)
+        self.cikti_aciklama.delete(0, tk.END)
         self.cikti_tarih.set_date(datetime.now())
         self.stok_bilgisi.config(text="Mevcut Stok: -")
 
@@ -636,6 +652,7 @@ class StopTakipPro:
             selected = self.cikti_malzeme.get()
             personel = self.cikti_personel.get().strip()
             miktar = int(self.cikti_miktar.get())
+            aciklama = self.cikti_aciklama.get().strip()
             tarih = self.cikti_tarih.get()
         
             if not selected:
@@ -677,8 +694,8 @@ class StopTakipPro:
         
             # Çıkış kaydı oluştur
             self.c.execute(
-                "INSERT INTO malzeme_cikislari (giris_id, malzeme_adi, cikis_adedi, personel, tarih) VALUES (?, ?, ?, ?, ?)",
-                (giris_id, malzeme_adi, miktar, personel, tarih)
+                "INSERT INTO malzeme_cikislari (giris_id, malzeme_adi, cikis_adedi, personel, aciklama, tarih) VALUES (?, ?, ?, ?, ?, ?)",
+                (giris_id, malzeme_adi, miktar, personel, aciklama if aciklama else None, tarih)
             )
         
             # Mevcut stok güncelleme
@@ -707,7 +724,7 @@ class StopTakipPro:
         self.entry_fiyat.delete(0, tk.END)
         self.entry_adet.delete(0, tk.END)
         self.entry_kdv.delete(0, tk.END)
-        self.entry_kdv.insert(0, "20")  # Varsayılan KDV
+        self.entry_kdv.insert(0, str(self.default_kdv_rate))  # Varsayılan KDV
         self.entry_tarih.set_date(datetime.now())
         self.entry_kategori.set('')
         self.entry_tedarikci.delete(0, tk.END)
@@ -742,13 +759,15 @@ class StopTakipPro:
                 messagebox.showerror("Hata", "Malzeme adı boş olamaz!")
                 return
         
-            # KDV dahil toplam
-            toplam = (fiyat * adet) * (1 + kdv_orani)
+            # KDV hesaplamaları
+            kdvsiz_toplam = fiyat * adet
+            kdv_tutari = kdvsiz_toplam * kdv_orani
+            kdv_dahil_toplam = kdvsiz_toplam + kdv_tutari
         
             # Veritabanına ekle
             self.c.execute(
-                "INSERT INTO malzeme_girisleri (ad, fiyat, adet, kdv, toplam, tarih, kategori, tedarikci) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (ad, fiyat, adet, kdv_orani, toplam, tarih, kategori if kategori else None, tedarikci if tedarikci else None)
+                "INSERT INTO malzeme_girisleri (ad, fiyat, adet, kdv, kdv_tutari, toplam, tarih, kategori, tedarikci) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (ad, fiyat, adet, kdv_orani, kdv_tutari, kdv_dahil_toplam, tarih, kategori if kategori else None, tedarikci if tedarikci else None)
             )
         
             # Mevcut stok güncelleme
@@ -760,7 +779,11 @@ class StopTakipPro:
         
             self.conn.commit()
         
-            messagebox.showinfo("Başarılı", f"{ad} malzemesi başarıyla eklendi!\nToplam: {toplam:.2f} ₺")
+            messagebox.showinfo("Başarılı", 
+                              f"{ad} malzemesi başarıyla eklendi!\n"
+                              f"KDV'siz Toplam: {kdvsiz_toplam:.2f} ₺\n"
+                              f"KDV Tutarı: {kdv_tutari:.2f} ₺\n"
+                              f"KDV Dahil Toplam: {kdv_dahil_toplam:.2f} ₺")
         
             # Formu temizle ve verileri yenile
             self._temizle_form()
@@ -812,6 +835,7 @@ class StopTakipPro:
                                             foreground='white', borderwidth=2, date_pattern='dd.MM.yyyy',
                                             font=FONT_PRIMARY)
         self.hareket_bitis_tarih.grid(row=0, column=3, padx=5, pady=5)
+        self.hareket_bitis_tarih.set_date(datetime.now())  # Bugün
         
         # Kategori filtre
         ttk.Label(filter_frame, text="Kategori:", style="TLabel").grid(row=0, column=4, padx=5, pady=5)
@@ -848,9 +872,12 @@ class StopTakipPro:
             ("Hareket Türü", 100),
             ("Miktar", 100),
             ("Birim Fiyat", 100),
+            ("KDV'siz Toplam", 120),
+            ("KDV Tutarı", 100),
             ("Toplam Maliyet", 120),
             ("Personel/Tedarikçi", 200),
-            ("Kategori", 150)
+            ("Kategori", 150),
+            ("Açıklama", 200)
         ]
         
         self.hareket_tree = ttk.Treeview(
@@ -883,6 +910,14 @@ class StopTakipPro:
         self.label_toplam_cikis = ttk.Label(self.hareket_total_frame, text="0", style="Header.TLabel", foreground=DANGER_COLOR)
         self.label_toplam_cikis.pack(side=tk.LEFT, padx=5)
         
+        ttk.Label(self.hareket_total_frame, text="KDV'siz Toplam:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.label_kdvsiz_toplam = ttk.Label(self.hareket_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=PRIMARY_COLOR)
+        self.label_kdvsiz_toplam.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(self.hareket_total_frame, text="KDV Tutarı:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.label_kdv_tutari = ttk.Label(self.hareket_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=WARNING_COLOR)
+        self.label_kdv_tutari.pack(side=tk.LEFT, padx=5)
+        
         ttk.Label(self.hareket_total_frame, text="Toplam Maliyet:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.label_toplam_maliyet = ttk.Label(self.hareket_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=ACCENT_COLOR)
         self.label_toplam_maliyet.pack(side=tk.LEFT, padx=5)
@@ -913,6 +948,14 @@ class StopTakipPro:
         malzeme = self.malzeme_filtre.get()
         hareket_turu = self.hareket_turu_filtre.get()
         
+        # Tarih formatını kontrol et ve düzelt
+        try:
+            baslangic_date = datetime.strptime(baslangic_tarih, "%d.%m.%Y")
+            bitis_date = datetime.strptime(bitis_tarih, "%d.%m.%Y")
+        except ValueError:
+            messagebox.showerror("Hata", "Geçersiz tarih formatı! dd.mm.yyyy formatında girin.")
+            return
+        
         # Giriş hareketlerini sorgula
         giris_query = """
         SELECT 
@@ -921,14 +964,21 @@ class StopTakipPro:
             'Giriş' AS hareket_turu,
             mg.adet AS miktar,
             mg.fiyat AS birim_fiyat,
+            (mg.fiyat * mg.adet) AS kdvsiz_toplam,
+            mg.kdv_tutari AS kdv_tutari,
             mg.toplam AS toplam_maliyet,
             COALESCE(mg.tedarikci, 'Belirtilmemiş') AS tedarikci,
-            COALESCE(mg.kategori, 'Kategorisiz') AS kategori
+            COALESCE(mg.kategori, 'Kategorisiz') AS kategori,
+            '' AS aciklama
         FROM malzeme_girisleri mg
-        WHERE mg.tarih BETWEEN ? AND ?
+        WHERE date(substr(mg.tarih, 7, 4) || '-' || substr(mg.tarih, 4, 2) || '-' || substr(mg.tarih, 1, 2)) 
+              BETWEEN date(?) AND date(?)
         """
         
-        giris_params = [baslangic_tarih, bitis_tarih]
+        giris_params = [
+            baslangic_date.strftime("%Y-%m-%d"), 
+            bitis_date.strftime("%Y-%m-%d")
+        ]
         
         if kategori:
             giris_query += " AND mg.kategori = ?"
@@ -946,14 +996,21 @@ class StopTakipPro:
             'Çıkış' AS hareket_turu,
             mc.cikis_adedi AS miktar,
             (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id) AS birim_fiyat,
-            (mc.cikis_adedi * (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS toplam_maliyet,
+            (mc.cikis_adedi * (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdvsiz_toplam,
+            (mc.cikis_adedi * (SELECT mg.kdv_tutari/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdv_tutari,
+            (mc.cikis_adedi * (SELECT mg.toplam/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS toplam_maliyet,
             mc.personel AS personel,
-            (SELECT COALESCE(mg.kategori, 'Kategorisiz') FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id) AS kategori
+            (SELECT COALESCE(mg.kategori, 'Kategorisiz') FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id) AS kategori,
+            COALESCE(mc.aciklama, '') AS aciklama
         FROM malzeme_cikislari mc
-        WHERE mc.tarih BETWEEN ? AND ?
+        WHERE date(substr(mc.tarih, 7, 4) || '-' || substr(mc.tarih, 4, 2) || '-' || substr(mc.tarih, 1, 2)) 
+              BETWEEN date(?) AND date(?)
         """
         
-        cikis_params = [baslangic_tarih, bitis_tarih]
+        cikis_params = [
+            baslangic_date.strftime("%Y-%m-%d"), 
+            bitis_date.strftime("%Y-%m-%d")
+        ]
         
         if kategori:
             cikis_query += " AND EXISTS (SELECT 1 FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id AND mg.kategori = ?)"
@@ -974,13 +1031,15 @@ class StopTakipPro:
             query = giris_query + " UNION ALL " + cikis_query
             params = giris_params + cikis_params
         
-        query += " ORDER BY tarih DESC"
+        query += " ORDER BY date(substr(tarih, 7, 4) || '-' || substr(tarih, 4, 2) || '-' || substr(tarih, 1, 2)) DESC"
         
         self.c.execute(query, params)
         rows = self.c.fetchall()
         
         toplam_giris = 0
         toplam_cikis = 0
+        toplam_kdvsiz = 0.0
+        toplam_kdv = 0.0
         toplam_maliyet = 0.0
         
         for row in rows:
@@ -988,13 +1047,18 @@ class StopTakipPro:
             
             if row[2] == 'Giriş':
                 toplam_giris += row[3]
-                toplam_maliyet += row[5] if row[5] else 0
             else:
                 toplam_cikis += row[3]
+            
+            toplam_kdvsiz += row[5] if row[5] else 0
+            toplam_kdv += row[6] if row[6] else 0
+            toplam_maliyet += row[7] if row[7] else 0
         
         # Toplamları güncelle
         self.label_toplam_giris.config(text=str(toplam_giris))
         self.label_toplam_cikis.config(text=str(toplam_cikis))
+        self.label_kdvsiz_toplam.config(text=f"{toplam_kdvsiz:.2f} ₺")
+        self.label_kdv_tutari.config(text=f"{toplam_kdv:.2f} ₺")
         self.label_toplam_maliyet.config(text=f"{toplam_maliyet:.2f} ₺")
 
     def _setup_mevcut_stok_tab(self):
@@ -1043,6 +1107,8 @@ class StopTakipPro:
             ("Kategori", 150),
             ("Mevcut Stok", 100),
             ("Birim Fiyat (₺)", 120),
+            ("KDV'siz Toplam (₺)", 150),
+            ("KDV Tutarı (₺)", 120),
             ("Toplam Maliyet (₺)", 150),
             ("Tedarikçi", 200),
             ("Son Giriş Tarihi", 120)
@@ -1074,8 +1140,16 @@ class StopTakipPro:
         self.stok_label_toplam_malzeme = ttk.Label(self.stok_total_frame, text="0", style="Header.TLabel", foreground=PRIMARY_COLOR)
         self.stok_label_toplam_malzeme.pack(side=tk.LEFT, padx=5)
         
+        ttk.Label(self.stok_total_frame, text="KDV'siz Toplam:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.stok_label_kdvsiz_toplam = ttk.Label(self.stok_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=SECONDARY_COLOR)
+        self.stok_label_kdvsiz_toplam.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(self.stok_total_frame, text="KDV Tutarı:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.stok_label_kdv_tutari = ttk.Label(self.stok_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=WARNING_COLOR)
+        self.stok_label_kdv_tutari.pack(side=tk.LEFT, padx=5)
+        
         ttk.Label(self.stok_total_frame, text="Toplam Maliyet:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
-        self.stok_label_toplam_maliyet = ttk.Label(self.stok_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=SECONDARY_COLOR)
+        self.stok_label_toplam_maliyet = ttk.Label(self.stok_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=ACCENT_COLOR)
         self.stok_label_toplam_maliyet.pack(side=tk.LEFT, padx=5)
         
         ttk.Label(self.stok_total_frame, text="Düşük Stok:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
@@ -1113,7 +1187,9 @@ class StopTakipPro:
             COALESCE((SELECT kategori FROM malzeme_girisleri WHERE ad=ms.malzeme_adi LIMIT 1), 'Kategorisiz') AS kategori,
             ms.toplam_adet AS mevcut_stok,
             (SELECT fiyat FROM malzeme_girisleri WHERE ad=ms.malzeme_adi ORDER BY tarih DESC LIMIT 1) AS birim_fiyat,
-            (ms.toplam_adet * (SELECT fiyat FROM malzeme_girisleri WHERE ad=ms.malzeme_adi ORDER BY tarih DESC LIMIT 1)) AS toplam_maliyet,
+            (ms.toplam_adet * (SELECT fiyat FROM malzeme_girisleri WHERE ad=ms.malzeme_adi ORDER BY tarih DESC LIMIT 1)) AS kdvsiz_toplam,
+            (ms.toplam_adet * (SELECT kdv_tutari/adet FROM malzeme_girisleri WHERE ad=ms.malzeme_adi ORDER BY tarih DESC LIMIT 1)) AS kdv_tutari,
+            (ms.toplam_adet * (SELECT toplam/adet FROM malzeme_girisleri WHERE ad=ms.malzeme_adi ORDER BY tarih DESC LIMIT 1)) AS toplam_maliyet,
             COALESCE((SELECT tedarikci FROM malzeme_girisleri WHERE ad=ms.malzeme_adi ORDER BY tarih DESC LIMIT 1), 'Belirtilmemiş') AS tedarikci,
             (SELECT MAX(tarih) FROM malzeme_girisleri WHERE ad=ms.malzeme_adi) AS son_giris_tarihi
         FROM mevcut_stok ms
@@ -1141,18 +1217,33 @@ class StopTakipPro:
         rows = self.c.fetchall()
     
         total_malzeme = 0
+        total_kdvsiz = 0.0
+        total_kdv = 0.0
         total_maliyet = 0.0
         dusuk_stok = 0
     
         for row in rows:
-            self.stok_tree.insert("", tk.END, values=row)
+            formatted_row = list(row)
+            # Tarih formatını düzelt
+            if formatted_row[8]:
+                try:
+                    tarih = datetime.strptime(formatted_row[8], "%d.%m.%Y").strftime("%d.%m.%Y")
+                    formatted_row[8] = tarih
+                except:
+                    formatted_row[8] = "Bilinmiyor"
+            
+            self.stok_tree.insert("", tk.END, values=formatted_row)
             total_malzeme += row[2]
-            total_maliyet += row[4] if row[4] else 0
+            total_kdvsiz += row[4] if row[4] else 0
+            total_kdv += row[5] if row[5] else 0
+            total_maliyet += row[6] if row[6] else 0
             if row[2] < 10:
                 dusuk_stok += 1
     
         # Toplamları güncelle
         self.stok_label_toplam_malzeme.config(text=str(total_malzeme))
+        self.stok_label_kdvsiz_toplam.config(text=f"{total_kdvsiz:.2f} ₺")
+        self.stok_label_kdv_tutari.config(text=f"{total_kdv:.2f} ₺")
         self.stok_label_toplam_maliyet.config(text=f"{total_maliyet:.2f} ₺")
         self.stok_label_dusuk_stok.config(text=str(dusuk_stok))   
 
@@ -1226,6 +1317,8 @@ class StopTakipPro:
             ("Giriş Miktarı", 120),
             ("Çıkış Miktarı", 120),
             ("Net Değişim", 120),
+            ("KDV'siz Toplam (₺)", 150),
+            ("KDV Tutarı (₺)", 150),
             ("Toplam Maliyet (₺)", 150)
         ]
         
@@ -1262,6 +1355,14 @@ class StopTakipPro:
         ttk.Label(self.aylik_total_frame, text="Yıllık Net Değişim:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.aylik_label_net_degisim = ttk.Label(self.aylik_total_frame, text="0", style="Header.TLabel", foreground=PRIMARY_COLOR)
         self.aylik_label_net_degisim.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(self.aylik_total_frame, text="Yıllık KDV'siz Toplam:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_kdvsiz_toplam = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=PRIMARY_COLOR)
+        self.aylik_label_kdvsiz_toplam.pack(side=tk.LEFT, padx=5)
+        
+        ttk.Label(self.aylik_total_frame, text="Yıllık KDV Tutarı:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_kdv_tutari = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=WARNING_COLOR)
+        self.aylik_label_kdv_tutari.pack(side=tk.LEFT, padx=5)
         
         ttk.Label(self.aylik_total_frame, text="Yıllık Toplam Maliyet:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.aylik_label_toplam_maliyet = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=ACCENT_COLOR)
@@ -1307,6 +1408,8 @@ class StopTakipPro:
         # Her ay için verileri topla
         yillik_toplam_giris = 0
         yillik_toplam_cikis = 0
+        yillik_toplam_kdvsiz = 0.0
+        yillik_toplam_kdv = 0.0
         yillik_toplam_maliyet = 0.0
         
         for ay_adi, ay_no in aylar:
@@ -1316,18 +1419,25 @@ class StopTakipPro:
             if ay_no == 12:
                 bitis_tarih = datetime(yil, ay_no, 31).strftime("%d.%m.%Y")
             else:
-                bitis_tarih = datetime(yil, ay_no+1, 1).strftime("%d.%m.%Y")
+                bitis_tarih = (datetime(yil, ay_no+1, 1) - timedelta(days=1)).strftime("%d.%m.%Y")
             
             # Giriş sorgusu
             giris_query = """
             SELECT 
                 SUM(mg.adet) AS toplam_giris,
+                SUM(mg.fiyat * mg.adet) AS kdvsiz_toplam,
+                SUM(mg.kdv_tutari) AS kdv_tutari,
                 SUM(mg.toplam) AS toplam_maliyet
             FROM malzeme_girisleri mg
-            WHERE mg.tarih BETWEEN ? AND ?
+            WHERE date(substr(mg.tarih, 7, 4) || '-' || substr(mg.tarih, 4, 2) || '-' || substr(mg.tarih, 1, 2)) 
+                  BETWEEN date(?) AND date(?)
             """
             
-            giris_params = [baslangic_tarih, bitis_tarih]
+            giris_params = [
+                datetime(yil, ay_no, 1).strftime("%Y-%m-%d"),
+                (datetime(yil, ay_no+1, 1) - timedelta(days=1)).strftime("%Y-%m-%d") if ay_no != 12 
+                else datetime(yil, ay_no, 31).strftime("%Y-%m-%d")
+            ]
             
             if kategori:
                 giris_query += " AND mg.kategori = ?"
@@ -1340,17 +1450,27 @@ class StopTakipPro:
             self.c.execute(giris_query, giris_params)
             giris_result = self.c.fetchone()
             toplam_giris = giris_result[0] or 0
-            toplam_maliyet = giris_result[1] or 0.0
+            kdvsiz_toplam = giris_result[1] or 0.0
+            kdv_tutari = giris_result[2] or 0.0
+            toplam_maliyet = giris_result[3] or 0.0
             
             # Çıkış sorgusu
             cikis_query = """
             SELECT 
-                SUM(mc.cikis_adedi) AS toplam_cikis
+                SUM(mc.cikis_adedi) AS toplam_cikis,
+                SUM(mc.cikis_adedi * (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdvsiz_toplam,
+                SUM(mc.cikis_adedi * (SELECT mg.kdv_tutari/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdv_tutari,
+                SUM(mc.cikis_adedi * (SELECT mg.toplam/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS toplam_maliyet
             FROM malzeme_cikislari mc
-            WHERE mc.tarih BETWEEN ? AND ?
+            WHERE date(substr(mc.tarih, 7, 4) || '-' || substr(mc.tarih, 4, 2) || '-' || substr(mc.tarih, 1, 2)) 
+                  BETWEEN date(?) AND date(?)
             """
             
-            cikis_params = [baslangic_tarih, bitis_tarih]
+            cikis_params = [
+                datetime(yil, ay_no, 1).strftime("%Y-%m-%d"),
+                (datetime(yil, ay_no+1, 1) - timedelta(days=1)).strftime("%Y-%m-%d") if ay_no != 12 
+                else datetime(yil, ay_no, 31).strftime("%Y-%m-%d")
+            ]
             
             if kategori:
                 cikis_query += " AND EXISTS (SELECT 1 FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id AND mg.kategori = ?)"
@@ -1363,9 +1483,15 @@ class StopTakipPro:
             self.c.execute(cikis_query, cikis_params)
             cikis_result = self.c.fetchone()
             toplam_cikis = cikis_result[0] or 0
+            cikis_kdvsiz = cikis_result[1] or 0.0
+            cikis_kdv = cikis_result[2] or 0.0
+            cikis_maliyet = cikis_result[3] or 0.0
             
             # Toplamları hesapla
             net_degisim = toplam_giris - toplam_cikis
+            ay_kdvsiz_toplam = kdvsiz_toplam - cikis_kdvsiz
+            ay_kdv_tutari = kdv_tutari - cikis_kdv
+            ay_toplam_maliyet = toplam_maliyet - cikis_maliyet
             
             # Treeview'a ekle
             self.aylik_tree.insert("", tk.END, values=(
@@ -1373,18 +1499,24 @@ class StopTakipPro:
                 toplam_giris,
                 toplam_cikis,
                 net_degisim,
-                f"{toplam_maliyet:.2f}"
+                f"{ay_kdvsiz_toplam:.2f}",
+                f"{ay_kdv_tutari:.2f}",
+                f"{ay_toplam_maliyet:.2f}"
             ))
             
             # Yıllık toplamlara ekle
             yillik_toplam_giris += toplam_giris
             yillik_toplam_cikis += toplam_cikis
-            yillik_toplam_maliyet += toplam_maliyet
+            yillik_toplam_kdvsiz += ay_kdvsiz_toplam
+            yillik_toplam_kdv += ay_kdv_tutari
+            yillik_toplam_maliyet += ay_toplam_maliyet
         
         # Yıllık toplamları güncelle
         self.aylik_label_toplam_giris.config(text=str(yillik_toplam_giris))
         self.aylik_label_toplam_cikis.config(text=str(yillik_toplam_cikis))
         self.aylik_label_net_degisim.config(text=str(yillik_toplam_giris - yillik_toplam_cikis))
+        self.aylik_label_kdvsiz_toplam.config(text=f"{yillik_toplam_kdvsiz:.2f} ₺")
+        self.aylik_label_kdv_tutari.config(text=f"{yillik_toplam_kdv:.2f} ₺")
         self.aylik_label_toplam_maliyet.config(text=f"{yillik_toplam_maliyet:.2f} ₺")
 
     def _filter_aylik_rapor(self):
@@ -1414,7 +1546,7 @@ class StopTakipPro:
         ttk.Label(kdv_frame, text="Varsayılan KDV Oranı (%):", style="TLabel").pack(side=tk.LEFT, padx=5, pady=5)
         self.default_kdv = ttk.Entry(kdv_frame, width=5, font=FONT_PRIMARY)
         self.default_kdv.pack(side=tk.LEFT, padx=5, pady=5)
-        self.default_kdv.insert(0, "20")
+        self.default_kdv.insert(0, str(self.default_kdv_rate))
         
         ttk.Button(kdv_frame, text="Kaydet", style="Success.TButton",
                   command=self._save_settings).pack(side=tk.LEFT, padx=20, ipadx=15, ipady=3)
@@ -1474,6 +1606,7 @@ class StopTakipPro:
             if not (0 <= new_kdv <= 100):
                 raise ValueError("KDV oranı 0-100 arasında olmalıdır.")
             
+            self.default_kdv_rate = new_kdv
             messagebox.showinfo("Başarılı", "Ayarlar kaydedildi!")
         
         except ValueError as e:
@@ -1581,8 +1714,8 @@ class StopTakipPro:
         # Kategoriyi veritabanına eklemek için bir malzeme ekliyoruz (geçici çözüm)
         # Aslında ayrı bir kategori tablosu olmalı
         self.c.execute(
-            "INSERT INTO malzeme_girisleri (ad, fiyat, adet, kdv, toplam, tarih, kategori) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            ("KATEGORI_OLUSTURMA", 0, 0, 0, 0, datetime.now().strftime("%d.%m.%Y"), new_cat)
+            "INSERT INTO malzeme_girisleri (ad, fiyat, adet, kdv, kdv_tutari, toplam, tarih, kategori) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            ("KATEGORI_OLUSTURMA", 0, 0, 0, 0, 0, datetime.now().strftime("%d.%m.%Y"), new_cat)
         )
         self.conn.commit()
         
