@@ -336,7 +336,6 @@ class StopTakipPro:
         
         # Sidebar menü butonları
         menu_items = [
-            ("📊 Dashboard", self._show_dashboard),
             ("📦 Malzeme Ekle", lambda: self.notebook.select(0)),
             ("➖ Malzeme Çıktı", lambda: self.notebook.select(1)),
             ("🏭 Depo Takip", lambda: self.notebook.select(2)),
@@ -813,58 +812,58 @@ class StopTakipPro:
         """Hareket raporu alt sekmesini oluşturur"""
         tab = ttk.Frame(self.depo_notebook, style="Card.TFrame")
         self.depo_notebook.add(tab, text="Hareket Raporu")
-        
+
         # Başlık
         ttk.Label(tab, text="DEPO HAREKET RAPORU", style="Title.TLabel").pack(pady=(10, 15))
-        
+
         # Filtreleme paneli
-        filter_frame = ttk.LabelFrame(tab, text="Filtreleme Seçenekleri", 
+        filter_frame = ttk.LabelFrame(tab, text="Filtreleme Seçenekleri",
                                     style="Card.TFrame", padding=(15, 10))
         filter_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+
         # Tarih filtreleri
         ttk.Label(filter_frame, text="Başlangıç Tarihi:", style="TLabel").grid(row=0, column=0, padx=5, pady=5)
         self.hareket_baslangic_tarih = DateEntry(filter_frame, width=15, background='darkblue',
-                                               foreground='white', borderwidth=2, date_pattern='dd.MM.yyyy',
-                                               font=FONT_PRIMARY)
+                                                foreground='white', borderwidth=2, date_pattern='dd.MM.yyyy',
+                                                font=FONT_PRIMARY)
         self.hareket_baslangic_tarih.grid(row=0, column=1, padx=5, pady=5)
         self.hareket_baslangic_tarih.set_date(datetime.now().replace(day=1))  # Ayın ilk günü
-        
+
         ttk.Label(filter_frame, text="Bitiş Tarihi:", style="TLabel").grid(row=0, column=2, padx=5, pady=5)
         self.hareket_bitis_tarih = DateEntry(filter_frame, width=15, background='darkblue',
                                             foreground='white', borderwidth=2, date_pattern='dd.MM.yyyy',
                                             font=FONT_PRIMARY)
         self.hareket_bitis_tarih.grid(row=0, column=3, padx=5, pady=5)
         self.hareket_bitis_tarih.set_date(datetime.now())  # Bugün
-        
+
         # Kategori filtre
         ttk.Label(filter_frame, text="Kategori:", style="TLabel").grid(row=0, column=4, padx=5, pady=5)
         self.kategori_filtre = ttk.Combobox(filter_frame, width=20, font=FONT_PRIMARY)
         self.kategori_filtre.grid(row=0, column=5, padx=5, pady=5)
-        
+
         # Malzeme adı filtre
         ttk.Label(filter_frame, text="Malzeme Adı:", style="TLabel").grid(row=1, column=0, padx=5, pady=5)
         self.malzeme_filtre = ttk.Combobox(filter_frame, width=20, font=FONT_PRIMARY)
         self.malzeme_filtre.grid(row=1, column=1, padx=5, pady=5)
         self.malzeme_filtre.bind('<KeyRelease>', lambda event: self._autocomplete(event, 'ad'))
-        
+
         # Hareket türü filtre
         ttk.Label(filter_frame, text="Hareket Türü:", style="TLabel").grid(row=1, column=2, padx=5, pady=5)
         self.hareket_turu_filtre = ttk.Combobox(filter_frame, width=20, font=FONT_PRIMARY)
         self.hareket_turu_filtre['values'] = ['Tümü', 'Giriş', 'Çıkış']
         self.hareket_turu_filtre.current(0)
         self.hareket_turu_filtre.grid(row=1, column=3, padx=5, pady=5)
-        
+
         # Filtrele butonu
         ttk.Button(filter_frame, text="Filtrele", style="Primary.TButton",
-                  command=self._filter_hareket_raporu).grid(row=1, column=4, padx=10, ipadx=10, ipady=3)
+                command=self._filter_hareket_raporu).grid(row=1, column=4, padx=10, ipadx=10, ipady=3)
         ttk.Button(filter_frame, text="Filtreyi Temizle", style="Warning.TButton",
-                  command=self._clear_hareket_filter).grid(row=1, column=5, padx=5, ipadx=10, ipady=3)
-        
+                command=self._clear_hareket_filter).grid(row=1, column=5, padx=5, ipadx=10, ipady=3)
+
         # Tablo
         self.hareket_tree_frame = ttk.Frame(tab, style="Card.TFrame", padding=10)
         self.hareket_tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
-        
+
         # Treeview sütunları
         columns = [
             ("Tarih", 120),
@@ -879,187 +878,223 @@ class StopTakipPro:
             ("Kategori", 150),
             ("Açıklama", 200)
         ]
-        
+
         self.hareket_tree = ttk.Treeview(
-            self.hareket_tree_frame, 
+            self.hareket_tree_frame,
             columns=[col[0] for col in columns],
             show="headings",
             selectmode="extended"
         )
-        
+
         # Sütun başlıkları ve genişlikleri
         for col, width in columns:
             self.hareket_tree.heading(col, text=col)
             self.hareket_tree.column(col, width=width, anchor=tk.CENTER)
-        
+
         # Scrollbar
         scrollbar = ttk.Scrollbar(self.hareket_tree_frame, orient=tk.VERTICAL, command=self.hareket_tree.yview)
         self.hareket_tree.configure(yscroll=scrollbar.set)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.hareket_tree.pack(fill=tk.BOTH, expand=True)
-        
+
         # Toplam paneli
         self.hareket_total_frame = ttk.Frame(tab, style="Card.TFrame", padding=(15, 10))
         self.hareket_total_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+
         ttk.Label(self.hareket_total_frame, text="Toplam Giriş:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.label_toplam_giris = ttk.Label(self.hareket_total_frame, text="0", style="Header.TLabel", foreground=SECONDARY_COLOR)
         self.label_toplam_giris.pack(side=tk.LEFT, padx=5)
-        
+
         ttk.Label(self.hareket_total_frame, text="Toplam Çıkış:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.label_toplam_cikis = ttk.Label(self.hareket_total_frame, text="0", style="Header.TLabel", foreground=DANGER_COLOR)
         self.label_toplam_cikis.pack(side=tk.LEFT, padx=5)
-        
+
         ttk.Label(self.hareket_total_frame, text="KDV'siz Toplam:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.label_kdvsiz_toplam = ttk.Label(self.hareket_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=PRIMARY_COLOR)
         self.label_kdvsiz_toplam.pack(side=tk.LEFT, padx=5)
-        
+
         ttk.Label(self.hareket_total_frame, text="KDV Tutarı:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.label_kdv_tutari = ttk.Label(self.hareket_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=WARNING_COLOR)
         self.label_kdv_tutari.pack(side=tk.LEFT, padx=5)
-        
+
         ttk.Label(self.hareket_total_frame, text="Toplam Maliyet:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
         self.label_toplam_maliyet = ttk.Label(self.hareket_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=ACCENT_COLOR)
         self.label_toplam_maliyet.pack(side=tk.LEFT, padx=5)
-        
+
         # Butonlar
         btn_frame = ttk.Frame(tab)
         btn_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+
         ttk.Button(btn_frame, text="Excel'e Aktar", style="Success.TButton",
-                  command=lambda: self._export_excel(self.hareket_tree)).pack(side=tk.LEFT, padx=10, ipadx=15, ipady=5)
+                command=lambda: self._export_excel(self.hareket_tree)).pack(side=tk.LEFT, padx=10, ipadx=15, ipady=5)
         ttk.Button(btn_frame, text="Güncelle", style="Primary.TButton",
-                  command=self._load_hareket_raporu).pack(side=tk.RIGHT, padx=10, ipadx=15, ipady=5)
-        
+                command=self._load_hareket_raporu).pack(side=tk.RIGHT, padx=10, ipadx=15, ipady=5)
+
         # İlk yükleme
         self._load_hareket_raporu()
         self._load_categories()
-
+        
     def _load_hareket_raporu(self):
-        """Hareket raporu verilerini yükler"""
-        # Treeview'ı temizle
-        for row in self.hareket_tree.get_children():
-            self.hareket_tree.delete(row)
-        
-        # Filtreleri al
-        baslangic_tarih = self.hareket_baslangic_tarih.get()
-        bitis_tarih = self.hareket_bitis_tarih.get()
-        kategori = self.kategori_filtre.get()
-        malzeme = self.malzeme_filtre.get()
-        hareket_turu = self.hareket_turu_filtre.get()
-        
-        # Tarih formatını kontrol et ve düzelt
+        """Hareket raporu verilerini yükler ve görüntüler"""
         try:
-            baslangic_date = datetime.strptime(baslangic_tarih, "%d.%m.%Y")
-            bitis_date = datetime.strptime(bitis_tarih, "%d.%m.%Y")
-        except ValueError:
-            messagebox.showerror("Hata", "Geçersiz tarih formatı! dd.mm.yyyy formatında girin.")
-            return
+            # Treeview'ı temizle
+            for row in self.hareket_tree.get_children():
+                self.hareket_tree.delete(row)
+
+            # Filtreleri al ve doğrula
+            baslangic_tarih = self.hareket_baslangic_tarih.get()
+            bitis_tarih = self.hareket_bitis_tarih.get()
+            kategori = self.kategori_filtre.get()
+            malzeme = self.malzeme_filtre.get()
+            hareket_turu = self.hareket_turu_filtre.get()
+
+            # Tarih formatını kontrol et
+            try:
+                baslangic_date = datetime.strptime(baslangic_tarih, "%d.%m.%Y")
+                bitis_date = datetime.strptime(bitis_tarih, "%d.%m.%Y")
+
+                # Başlangıç tarihi bitiş tarihinden sonra olamaz
+                if baslangic_date > bitis_date:
+                    messagebox.showerror("Hata", "Başlangıç tarihi bitiş tarihinden sonra olamaz!")
+                    return
+
+            except ValueError:
+                messagebox.showerror("Hata", "Geçersiz tarih formatı! Lütfen dd.mm.yyyy formatında girin.")
+                return
+
+            # Giriş hareketleri için sorgu
+            giris_query = """
+            SELECT 
+                mg.tarih AS hareket_tarih,
+                mg.ad AS malzeme_adi,
+                'Giriş' AS hareket_turu,
+                mg.adet AS miktar,
+                mg.fiyat AS birim_fiyat,
+                (mg.fiyat * mg.adet) AS kdvsiz_toplam,
+                mg.kdv_tutari AS kdv_tutari,
+                mg.toplam AS toplam_maliyet,
+                COALESCE(mg.tedarikci, 'Belirtilmemiş') AS tedarikci,
+                COALESCE(mg.kategori, 'Kategorisiz') AS kategori,
+                '' AS aciklama
+            FROM malzeme_girisleri mg
+            WHERE date(substr(mg.tarih, 7, 4) || '-' || substr(mg.tarih, 4, 2) || '-' || substr(mg.tarih, 1, 2)) 
+                BETWEEN date(?) AND date(?)
+            """
+
+            giris_params = [
+                baslangic_date.strftime("%Y-%m-%d"), 
+                bitis_date.strftime("%Y-%m-%d")
+            ]
+
+            if kategori and kategori.strip():
+                giris_query += " AND mg.kategori = ?"
+                giris_params.append(kategori.strip())
+
+            if malzeme and malzeme.strip():
+                giris_query += " AND mg.ad LIKE ?"
+                giris_params.append(f'%{malzeme.strip()}%')
+
+            # Çıkış hareketleri için sorgu
+            cikis_query = """
+            SELECT 
+                mc.tarih AS hareket_tarih,
+                mc.malzeme_adi AS malzeme_adi,
+                'Çıkış' AS hareket_turu,
+                mc.cikis_adedi AS miktar,
+                (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id) AS birim_fiyat,
+                (mc.cikis_adedi * (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdvsiz_toplam,
+                (mc.cikis_adedi * (SELECT mg.kdv_tutari/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdv_tutari,
+                (mc.cikis_adedi * (SELECT mg.toplam/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS toplam_maliyet,
+                mc.personel AS personel,
+                (SELECT COALESCE(mg.kategori, 'Kategorisiz') FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id) AS kategori,
+                COALESCE(mc.aciklama, '') AS aciklama
+            FROM malzeme_cikislari mc
+            WHERE date(substr(mc.tarih, 7, 4) || '-' || substr(mc.tarih, 4, 2) || '-' || substr(mc.tarih, 1, 2)) 
+                BETWEEN date(?) AND date(?)
+            """
+
+            cikis_params = [
+                baslangic_date.strftime("%Y-%m-%d"), 
+                bitis_date.strftime("%Y-%m-%d")
+            ]
+
+            if kategori and kategori.strip():
+                cikis_query += " AND EXISTS (SELECT 1 FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id AND mg.kategori = ?)"
+                cikis_params.append(kategori.strip())
+
+            if malzeme and malzeme.strip():
+                cikis_query += " AND mc.malzeme_adi LIKE ?"
+                cikis_params.append(f'%{malzeme.strip()}%')
+
+            # Sorguyu oluştur
+            if hareket_turu == 'Giriş':
+                query = giris_query + " ORDER BY date(substr(hareket_tarih, 7, 4) || '-' || substr(hareket_tarih, 4, 2) || '-' || substr(hareket_tarih, 1, 2)) DESC"
+                params = giris_params
+            elif hareket_turu == 'Çıkış':
+                query = cikis_query + " ORDER BY date(substr(hareket_tarih, 7, 4) || '-' || substr(hareket_tarih, 4, 2) || '-' || substr(hareket_tarih, 1, 2)) DESC"
+                params = cikis_params
+            else:  # Tümü
+                query = f"""
+                SELECT * FROM (
+                    {giris_query}
+                    UNION ALL
+                    {cikis_query}
+                ) 
+                ORDER BY date(substr(hareket_tarih, 7, 4) || '-' || substr(hareket_tarih, 4, 2) || '-' || substr(hareket_tarih, 1, 2)) DESC
+                """
+                params = giris_params + cikis_params
+
+            # Sorguyu çalıştır
+            self.c.execute(query, params)
+            rows = self.c.fetchall()
+
+            # Toplamları hesapla
+            toplam_giris = 0
+            toplam_cikis = 0
+            toplam_kdvsiz = 0.0
+            toplam_kdv = 0.0
+            toplam_maliyet = 0.0
+
+            for row in rows:
+                # Treeview'a ekle
+                self.hareket_tree.insert("", tk.END, values=row)
+
+                # Toplamları güncelle
+                if row[2] == 'Giriş':
+                    toplam_giris += row[3] if row[3] else 0
+                else:
+                    toplam_cikis += row[3] if row[3] else 0
+
+                toplam_kdvsiz += row[5] if row[5] else 0
+                toplam_kdv += row[6] if row[6] else 0
+                toplam_maliyet += row[7] if row[7] else 0
+
+            # Toplamları göster
+            self.label_toplam_giris.config(text=str(toplam_giris))
+            self.label_toplam_cikis.config(text=str(toplam_cikis))
+            self.label_kdvsiz_toplam.config(text=f"{toplam_kdvsiz:.2f} ₺")
+            self.label_kdv_tutari.config(text=f"{toplam_kdv:.2f} ₺")
+            self.label_toplam_maliyet.config(text=f"{toplam_maliyet:.2f} ₺")
+
+        except sqlite3.Error as e:
+            messagebox.showerror("Veritabanı Hatası", f"Veritabanı hatası oluştu:\n{str(e)}")
+        except Exception as e:
+            messagebox.showerror("Hata", f"Beklenmeyen bir hata oluştu:\n{str(e)}")
+
+    def _filter_hareket_raporu(self):
+        """Hareket raporu verilerini filtreler"""
+        self._load_hareket_raporu()
+
+    def _clear_hareket_filter(self):
+        """Hareket raporu filtrelerini temizler"""
+        self.hareket_baslangic_tarih.set_date(datetime.now().replace(day=1))
+        self.hareket_bitis_tarih.set_date(datetime.now())
+        self.kategori_filtre.set('')
+        self.malzeme_filtre.set('')
+        self.hareket_turu_filtre.current(0)
+        self._load_hareket_raporu()
         
-        # Giriş hareketlerini sorgula
-        giris_query = """
-        SELECT 
-            mg.tarih AS tarih,
-            mg.ad AS malzeme_adi,
-            'Giriş' AS hareket_turu,
-            mg.adet AS miktar,
-            mg.fiyat AS birim_fiyat,
-            (mg.fiyat * mg.adet) AS kdvsiz_toplam,
-            mg.kdv_tutari AS kdv_tutari,
-            mg.toplam AS toplam_maliyet,
-            COALESCE(mg.tedarikci, 'Belirtilmemiş') AS tedarikci,
-            COALESCE(mg.kategori, 'Kategorisiz') AS kategori,
-            '' AS aciklama
-        FROM malzeme_girisleri mg
-        WHERE date(substr(mg.tarih, 7, 4) || '-' || substr(mg.tarih, 4, 2) || '-' || substr(mg.tarih, 1, 2)) 
-              BETWEEN date(?) AND date(?)
-        """
-        
-        giris_params = [
-            baslangic_date.strftime("%Y-%m-%d"), 
-            bitis_date.strftime("%Y-%m-%d")
-        ]
-        
-        if kategori:
-            giris_query += " AND mg.kategori = ?"
-            giris_params.append(kategori)
-        
-        if malzeme:
-            giris_query += " AND mg.ad LIKE ?"
-            giris_params.append(f'%{malzeme}%')
-        
-        # Çıkış hareketlerini sorgula
-        cikis_query = """
-        SELECT 
-            mc.tarih AS tarih,
-            mc.malzeme_adi AS malzeme_adi,
-            'Çıkış' AS hareket_turu,
-            mc.cikis_adedi AS miktar,
-            (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id) AS birim_fiyat,
-            (mc.cikis_adedi * (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdvsiz_toplam,
-            (mc.cikis_adedi * (SELECT mg.kdv_tutari/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdv_tutari,
-            (mc.cikis_adedi * (SELECT mg.toplam/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS toplam_maliyet,
-            mc.personel AS personel,
-            (SELECT COALESCE(mg.kategori, 'Kategorisiz') FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id) AS kategori,
-            COALESCE(mc.aciklama, '') AS aciklama
-        FROM malzeme_cikislari mc
-        WHERE date(substr(mc.tarih, 7, 4) || '-' || substr(mc.tarih, 4, 2) || '-' || substr(mc.tarih, 1, 2)) 
-              BETWEEN date(?) AND date(?)
-        """
-        
-        cikis_params = [
-            baslangic_date.strftime("%Y-%m-%d"), 
-            bitis_date.strftime("%Y-%m-%d")
-        ]
-        
-        if kategori:
-            cikis_query += " AND EXISTS (SELECT 1 FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id AND mg.kategori = ?)"
-            cikis_params.append(kategori)
-        
-        if malzeme:
-            cikis_query += " AND mc.malzeme_adi LIKE ?"
-            cikis_params.append(f'%{malzeme}%')
-        
-        # Hareket türüne göre sorguyu belirle
-        if hareket_turu == 'Giriş':
-            query = giris_query
-            params = giris_params
-        elif hareket_turu == 'Çıkış':
-            query = cikis_query
-            params = cikis_params
-        else:  # Tümü
-            query = giris_query + " UNION ALL " + cikis_query
-            params = giris_params + cikis_params
-        
-        query += " ORDER BY date(substr(tarih, 7, 4) || '-' || substr(tarih, 4, 2) || '-' || substr(tarih, 1, 2)) DESC"
-        
-        self.c.execute(query, params)
-        rows = self.c.fetchall()
-        
-        toplam_giris = 0
-        toplam_cikis = 0
-        toplam_kdvsiz = 0.0
-        toplam_kdv = 0.0
-        toplam_maliyet = 0.0
-        
-        for row in rows:
-            self.hareket_tree.insert("", tk.END, values=row)
-            
-            if row[2] == 'Giriş':
-                toplam_giris += row[3]
-            else:
-                toplam_cikis += row[3]
-            
-            toplam_kdvsiz += row[5] if row[5] else 0
-            toplam_kdv += row[6] if row[6] else 0
-            toplam_maliyet += row[7] if row[7] else 0
-        
-        # Toplamları güncelle
-        self.label_toplam_giris.config(text=str(toplam_giris))
-        self.label_toplam_cikis.config(text=str(toplam_cikis))
-        self.label_kdvsiz_toplam.config(text=f"{toplam_kdvsiz:.2f} ₺")
-        self.label_kdv_tutari.config(text=f"{toplam_kdv:.2f} ₺")
-        self.label_toplam_maliyet.config(text=f"{toplam_maliyet:.2f} ₺")
+
 
     def _setup_mevcut_stok_tab(self):
         """Mevcut stok alt sekmesini oluşturur"""
@@ -1303,7 +1338,7 @@ class StopTakipPro:
         
         # Filtrele butonu
         ttk.Button(filter_frame, text="Filtrele", style="Primary.TButton",
-                  command=self._filter_aylik_rapor).grid(row=0, column=6, padx=10, ipadx=10, ipady=3)
+                  command=self._load_aylik_rapor).grid(row=0, column=6, padx=10, ipadx=10, ipady=3)
         ttk.Button(filter_frame, text="Filtreyi Temizle", style="Warning.TButton",
                   command=self._clear_aylik_filter).grid(row=0, column=7, padx=5, ipadx=10, ipady=3)
         
@@ -1311,15 +1346,15 @@ class StopTakipPro:
         self.aylik_tree_frame = ttk.Frame(frame, style="Card.TFrame", padding=10)
         self.aylik_tree_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
-        # Treeview sütunları
+        # Treeview sütunları (YENİ SÜTUN BAŞLIKLARI)
         columns = [
             ("Ay", 150),
-            ("Giriş Miktarı", 120),
-            ("Çıkış Miktarı", 120),
-            ("Net Değişim", 120),
-            ("KDV'siz Toplam (₺)", 150),
-            ("KDV Tutarı (₺)", 150),
-            ("Toplam Maliyet (₺)", 150)
+            ("Girdi KDV'siz (₺)", 150),
+            ("Girdi KDV Tutarı (₺)", 150),
+            ("Girdi Toplam (₺)", 150),
+            ("Çıktı KDV'siz (₺)", 150),
+            ("Çıktı KDV Tutarı (₺)", 150),
+            ("Çıktı Toplam (₺)", 150)
         ]
         
         self.aylik_tree = ttk.Treeview(
@@ -1340,46 +1375,47 @@ class StopTakipPro:
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.aylik_tree.pack(fill=tk.BOTH, expand=True)
         
-        # Toplam paneli
+        # Toplam paneli (YENİ TOPLAM ETİKETLERİ)
         self.aylik_total_frame = ttk.Frame(frame, style="Card.TFrame", padding=(15, 10))
         self.aylik_total_frame.pack(fill=tk.X, padx=20, pady=10)
         
-        ttk.Label(self.aylik_total_frame, text="Yıllık Toplam Giriş:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
-        self.aylik_label_toplam_giris = ttk.Label(self.aylik_total_frame, text="0", style="Header.TLabel", foreground=SECONDARY_COLOR)
-        self.aylik_label_toplam_giris.pack(side=tk.LEFT, padx=5)
+        ttk.Label(self.aylik_total_frame, text="Yıllık Girdi KDV'siz:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_girdi_kdvsiz = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=SECONDARY_COLOR)
+        self.aylik_label_girdi_kdvsiz.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(self.aylik_total_frame, text="Yıllık Toplam Çıkış:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
-        self.aylik_label_toplam_cikis = ttk.Label(self.aylik_total_frame, text="0", style="Header.TLabel", foreground=DANGER_COLOR)
-        self.aylik_label_toplam_cikis.pack(side=tk.LEFT, padx=5)
+        ttk.Label(self.aylik_total_frame, text="Yıllık Girdi KDV:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_girdi_kdv = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=WARNING_COLOR)
+        self.aylik_label_girdi_kdv.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(self.aylik_total_frame, text="Yıllık Net Değişim:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
-        self.aylik_label_net_degisim = ttk.Label(self.aylik_total_frame, text="0", style="Header.TLabel", foreground=PRIMARY_COLOR)
-        self.aylik_label_net_degisim.pack(side=tk.LEFT, padx=5)
+        ttk.Label(self.aylik_total_frame, text="Yıllık Girdi Toplam:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_girdi_toplam = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=PRIMARY_COLOR)
+        self.aylik_label_girdi_toplam.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(self.aylik_total_frame, text="Yıllık KDV'siz Toplam:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
-        self.aylik_label_kdvsiz_toplam = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=PRIMARY_COLOR)
-        self.aylik_label_kdvsiz_toplam.pack(side=tk.LEFT, padx=5)
+        ttk.Label(self.aylik_total_frame, text="Yıllık Çıktı KDV'siz:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_cikti_kdvsiz = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=SECONDARY_COLOR)
+        self.aylik_label_cikti_kdvsiz.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(self.aylik_total_frame, text="Yıllık KDV Tutarı:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
-        self.aylik_label_kdv_tutari = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=WARNING_COLOR)
-        self.aylik_label_kdv_tutari.pack(side=tk.LEFT, padx=5)
+        ttk.Label(self.aylik_total_frame, text="Yıllık Çıktı KDV:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_cikti_kdv = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=WARNING_COLOR)
+        self.aylik_label_cikti_kdv.pack(side=tk.LEFT, padx=5)
         
-        ttk.Label(self.aylik_total_frame, text="Yıllık Toplam Maliyet:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
-        self.aylik_label_toplam_maliyet = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=ACCENT_COLOR)
-        self.aylik_label_toplam_maliyet.pack(side=tk.LEFT, padx=5)
+        ttk.Label(self.aylik_total_frame, text="Yıllık Çıktı Toplam:", style="Header.TLabel").pack(side=tk.LEFT, padx=20)
+        self.aylik_label_cikti_toplam = ttk.Label(self.aylik_total_frame, text="0.00 ₺", style="Header.TLabel", foreground=DANGER_COLOR)
+        self.aylik_label_cikti_toplam.pack(side=tk.LEFT, padx=5)
         
         # Butonlar
         btn_frame = ttk.Frame(frame)
         btn_frame.pack(fill=tk.X, padx=20, pady=10)
-        
+    
         ttk.Button(btn_frame, text="Excel'e Aktar", style="Success.TButton",
                   command=lambda: self._export_excel(self.aylik_tree)).pack(side=tk.LEFT, padx=10, ipadx=15, ipady=5)
         ttk.Button(btn_frame, text="Güncelle", style="Primary.TButton",
-                  command=self._load_aylik_rapor).pack(side=tk.RIGHT, padx=10, ipadx=15, ipady=5)
-        
+                  command=self._load_aylik_rapor).pack(side=tk.RIGHT, padx=10, ipadx=15, ipady=5)  # Burada _load_aylik_rapor yerine _load_aylik_rapor kullanıldı
+    
         # İlk yükleme
-        self._load_aylik_rapor()
+        self._load_aylik_rapor()  # Burada da aynı değişiklik
         self._load_categories()
+
 
     def _load_aylik_rapor(self):
         """Aylık rapor verilerini yükler"""
@@ -1405,26 +1441,18 @@ class StopTakipPro:
             ("Eylül", 9), ("Ekim", 10), ("Kasım", 11), ("Aralık", 12)
         ]
         
-        # Her ay için verileri topla
-        yillik_toplam_giris = 0
-        yillik_toplam_cikis = 0
-        yillik_toplam_kdvsiz = 0.0
-        yillik_toplam_kdv = 0.0
-        yillik_toplam_maliyet = 0.0
+        # Yıllık toplamlar
+        yillik_girdi_kdvsiz = 0.0
+        yillik_girdi_kdv = 0.0
+        yillik_girdi_toplam = 0.0
+        yillik_cikti_kdvsiz = 0.0
+        yillik_cikti_kdv = 0.0
+        yillik_cikti_toplam = 0.0
         
         for ay_adi, ay_no in aylar:
-            # Ayın başlangıç ve bitiş tarihleri
-            baslangic_tarih = datetime(yil, ay_no, 1).strftime("%d.%m.%Y")
-            
-            if ay_no == 12:
-                bitis_tarih = datetime(yil, ay_no, 31).strftime("%d.%m.%Y")
-            else:
-                bitis_tarih = (datetime(yil, ay_no+1, 1) - timedelta(days=1)).strftime("%d.%m.%Y")
-            
-            # Giriş sorgusu
+            # Giriş sorgusu (DÜZELTİLMİŞ)
             giris_query = """
             SELECT 
-                SUM(mg.adet) AS toplam_giris,
                 SUM(mg.fiyat * mg.adet) AS kdvsiz_toplam,
                 SUM(mg.kdv_tutari) AS kdv_tutari,
                 SUM(mg.toplam) AS toplam_maliyet
@@ -1449,15 +1477,13 @@ class StopTakipPro:
             
             self.c.execute(giris_query, giris_params)
             giris_result = self.c.fetchone()
-            toplam_giris = giris_result[0] or 0
-            kdvsiz_toplam = giris_result[1] or 0.0
-            kdv_tutari = giris_result[2] or 0.0
-            toplam_maliyet = giris_result[3] or 0.0
+            girdi_kdvsiz = giris_result[0] or 0.0
+            girdi_kdv = giris_result[1] or 0.0
+            girdi_toplam = giris_result[2] or 0.0
             
-            # Çıkış sorgusu
+            # Çıkış sorgusu (DÜZELTİLMİŞ)
             cikis_query = """
             SELECT 
-                SUM(mc.cikis_adedi) AS toplam_cikis,
                 SUM(mc.cikis_adedi * (SELECT mg.fiyat FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdvsiz_toplam,
                 SUM(mc.cikis_adedi * (SELECT mg.kdv_tutari/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS kdv_tutari,
                 SUM(mc.cikis_adedi * (SELECT mg.toplam/mg.adet FROM malzeme_girisleri mg WHERE mg.id = mc.giris_id)) AS toplam_maliyet
@@ -1482,46 +1508,38 @@ class StopTakipPro:
             
             self.c.execute(cikis_query, cikis_params)
             cikis_result = self.c.fetchone()
-            toplam_cikis = cikis_result[0] or 0
-            cikis_kdvsiz = cikis_result[1] or 0.0
-            cikis_kdv = cikis_result[2] or 0.0
-            cikis_maliyet = cikis_result[3] or 0.0
-            
-            # Toplamları hesapla
-            net_degisim = toplam_giris - toplam_cikis
-            ay_kdvsiz_toplam = kdvsiz_toplam - cikis_kdvsiz
-            ay_kdv_tutari = kdv_tutari - cikis_kdv
-            ay_toplam_maliyet = toplam_maliyet - cikis_maliyet
+            cikti_kdvsiz = cikis_result[0] or 0.0
+            cikti_kdv = cikis_result[1] or 0.0
+            cikti_toplam = cikis_result[2] or 0.0
             
             # Treeview'a ekle
             self.aylik_tree.insert("", tk.END, values=(
                 ay_adi,
-                toplam_giris,
-                toplam_cikis,
-                net_degisim,
-                f"{ay_kdvsiz_toplam:.2f}",
-                f"{ay_kdv_tutari:.2f}",
-                f"{ay_toplam_maliyet:.2f}"
+                f"{girdi_kdvsiz:.2f}",
+                f"{girdi_kdv:.2f}",
+                f"{girdi_toplam:.2f}",
+                f"{cikti_kdvsiz:.2f}",
+                f"{cikti_kdv:.2f}",
+                f"{cikti_toplam:.2f}"
             ))
             
             # Yıllık toplamlara ekle
-            yillik_toplam_giris += toplam_giris
-            yillik_toplam_cikis += toplam_cikis
-            yillik_toplam_kdvsiz += ay_kdvsiz_toplam
-            yillik_toplam_kdv += ay_kdv_tutari
-            yillik_toplam_maliyet += ay_toplam_maliyet
+            yillik_girdi_kdvsiz += girdi_kdvsiz
+            yillik_girdi_kdv += girdi_kdv
+            yillik_girdi_toplam += girdi_toplam
+            yillik_cikti_kdvsiz += cikti_kdvsiz
+            yillik_cikti_kdv += cikti_kdv
+            yillik_cikti_toplam += cikti_toplam
         
         # Yıllık toplamları güncelle
-        self.aylik_label_toplam_giris.config(text=str(yillik_toplam_giris))
-        self.aylik_label_toplam_cikis.config(text=str(yillik_toplam_cikis))
-        self.aylik_label_net_degisim.config(text=str(yillik_toplam_giris - yillik_toplam_cikis))
-        self.aylik_label_kdvsiz_toplam.config(text=f"{yillik_toplam_kdvsiz:.2f} ₺")
-        self.aylik_label_kdv_tutari.config(text=f"{yillik_toplam_kdv:.2f} ₺")
-        self.aylik_label_toplam_maliyet.config(text=f"{yillik_toplam_maliyet:.2f} ₺")
+        self.aylik_label_girdi_kdvsiz.config(text=f"{yillik_girdi_kdvsiz:.2f} ₺")
+        self.aylik_label_girdi_kdv.config(text=f"{yillik_girdi_kdv:.2f} ₺")
+        self.aylik_label_girdi_toplam.config(text=f"{yillik_girdi_toplam:.2f} ₺")
+        self.aylik_label_cikti_kdvsiz.config(text=f"{yillik_cikti_kdvsiz:.2f} ₺")
+        self.aylik_label_cikti_kdv.config(text=f"{yillik_cikti_kdv:.2f} ₺")
+        self.aylik_label_cikti_toplam.config(text=f"{yillik_cikti_toplam:.2f} ₺")
 
-    def _filter_aylik_rapor(self):
-        """Aylık rapor verilerini filtreler"""
-        self._load_aylik_rapor()
+
 
     def _clear_aylik_filter(self):
         """Aylık rapor filtrelerini temizler"""
@@ -1560,8 +1578,7 @@ class StopTakipPro:
                   command=self._backup_db).pack(side=tk.LEFT, padx=10, ipadx=15, ipady=5)
         ttk.Button(db_frame, text="Yedekten Geri Yükle", style="Warning.TButton",
                   command=self._restore_db).pack(side=tk.LEFT, padx=10, ipadx=15, ipady=5)
-        ttk.Button(db_frame, text="Verileri Temizle", style="Danger.TButton",
-                  command=self._clear_db).pack(side=tk.LEFT, padx=10, ipadx=15, ipady=5)
+
         
         # Kategoriler
         cat_frame = ttk.LabelFrame(frame, text="Kategori Yönetimi", 
